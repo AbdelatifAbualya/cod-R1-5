@@ -276,43 +276,48 @@ Remember: This is Stage 1. Focus on thorough analysis and reasoning. A Stage 2 v
     }
   }
 
-  const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(stage1Payload)
-  });
+  try {
+    const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(stage1Payload)
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Stage 1 API Error:', response.status, errorText);
-    return { success: false, error: `Stage 1 API error: ${response.status}` };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Stage 1 API Error:', response.status, errorText);
+      return { success: false, error: `Stage 1 API error: ${response.status} - ${errorText}` };
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    
+    // Parse CoD structure
+    const separatorIndex = content.indexOf("####");
+    let thinking = "", answer = "";
+    
+    if (separatorIndex !== -1) {
+      thinking = content.substring(0, separatorIndex).trim();
+      answer = content.substring(separatorIndex + 4).trim();
+    } else {
+      thinking = content;
+      answer = "No preliminary answer found.";
+    }
+
+    return {
+      success: true,
+      content,
+      thinking,
+      answer,
+      usage: data.usage
+    };
+  } catch (error) {
+    console.error('Stage 1 fetch error:', error);
+    return { success: false, error: `Stage 1 request failed: ${error.message}` };
   }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  
-  // Parse CoD structure
-  const separatorIndex = content.indexOf("####");
-  let thinking = "", answer = "";
-  
-  if (separatorIndex !== -1) {
-    thinking = content.substring(0, separatorIndex).trim();
-    answer = content.substring(separatorIndex + 4).trim();
-  } else {
-    thinking = content;
-    answer = "No preliminary answer found.";
-  }
-
-  return {
-    success: true,
-    content,
-    thinking,
-    answer,
-    usage: data.usage
-  };
 }
 
 // Stage 2: Final Verification and Refinement
@@ -408,38 +413,39 @@ Please perform Stage 2 verification and provide the enhanced final answer.` }
     }
   }
 
-  const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(stage2Payload)
-  });
+  try {
+    const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(stage2Payload)
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Stage 2 API Error:', response.status, errorText);
-    return { success: false, error: `Stage 2 API error: ${response.status}` };
-  }
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Stage 2 API Error:', response.status, errorText);
+      return { success: false, error: `Stage 2 API error: ${response.status} - ${errorText}` };
+    }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  
-  // Parse Stage 2 structure
-  const finalSeparatorIndex = content.indexOf("####");
-  let verification = "", finalAnswer = "";
-  
-  if (finalSeparatorIndex !== -1) {
-    verification = content.substring(0, finalSeparatorIndex).trim();
-    finalAnswer = content.substring(finalSeparatorIndex + 4).trim();
-  } else {
-    verification = content;
-    finalAnswer = "Verification completed but no final answer section found.";
-  }
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    
+    // Parse Stage 2 structure
+    const finalSeparatorIndex = content.indexOf("####");
+    let verification = "", finalAnswer = "";
+    
+    if (finalSeparatorIndex !== -1) {
+      verification = content.substring(0, finalSeparatorIndex).trim();
+      finalAnswer = content.substring(finalSeparatorIndex + 4).trim();
+    } else {
+      verification = content;
+      finalAnswer = "Verification completed but no final answer section found.";
+    }
 
-  // Combine everything for final output
-  const finalContent = `${stage1Thinking}
+    // Combine everything for final output
+    const finalContent = `${stage1Thinking}
 
 ======= ENHANCED VERIFICATION & REFINEMENT =======
 
@@ -449,13 +455,17 @@ ${verification}
 
 ${finalAnswer}`;
 
-  return {
-    success: true,
-    verification,
-    finalAnswer,
-    finalContent,
-    usage: data.usage
-  };
+    return {
+      success: true,
+      verification,
+      finalAnswer,
+      finalContent,
+      usage: data.usage
+    };
+  } catch (error) {
+    console.error('Stage 2 fetch error:', error);
+    return { success: false, error: `Stage 2 request failed: ${error.message}` };
+  }
 }
 
 // Standard single API call (existing functionality)
